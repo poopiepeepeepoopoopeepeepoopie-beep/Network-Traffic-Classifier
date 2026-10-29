@@ -1,111 +1,88 @@
 # Network Traffic Classifier and Usage Dashboard: Commands Guide
 
-All commands are run from inside the `CN_project` folder (PowerShell or terminal).
+Everything now runs from one web page. Run all commands from inside the `CN_project` folder.
 
 ## Project layout
 
 ```
 CN_project/
-├── Datasets/            # put your .pcap / .cap files here
-├── main.py              # reads a pcap, classifies packets -> packet_analysis.csv
-├── analytics.py         # builds summary CSVs from packet_analysis.csv
-├── app.py               # dashboard for captured files (offline analysis)
-├── live_capture.py      # live packet capture -> live_packets.csv
-├── live_dashboard.py    # auto-refreshing dashboard for live capture
-└── COMMANDS.md          # this file
+├── Datasets/        # put your .pcap / .pcapng / .cap files here
+├── app.py           # the whole dashboard (upload, Datasets folder, live capture)
+├── main.py          # optional: command-line packet analysis -> CSV
+├── analytics.py     # optional: summary CSVs from main.py output
+└── COMMANDS.md
 ```
 
-## 1. One-time setup
+`live_capture.py` and `live_dashboard.py` are no longer needed, because live capture is built into `app.py`.
 
-Install Python 3.9 or newer, then:
+## 1. One-time setup
 
 ```
 python -m pip install scapy pandas plotly streamlit
 ```
 
-For live capture on Windows, also install **Npcap** from https://npcap.com (default options are fine).
+Windows only, for live capture: install **Npcap** from https://npcap.com (default options).
 
-Check that everything installed:
-
-```
-python -m pip show scapy streamlit plotly pandas
-```
-
-## 2. Analyze a capture file (offline)
-
-Put the capture in `Datasets/`, then run these three commands in order:
+## 2. Start the dashboard
 
 ```
-python main.py SkypeIRC.cap
-python analytics.py
 python -m streamlit run app.py
 ```
 
-| Command | What it does |
+For **live capture**, start the terminal first as **Administrator** on Windows, or use `sudo python3 -m streamlit run app.py` on Linux/macOS. For uploaded and Datasets files, a normal terminal is fine.
+
+The page opens at http://localhost:8501. Stop it with `Ctrl+C`.
+
+## 3. Using the page
+
+Pick a **Data source** in the sidebar:
+
+| Source | What to do |
 |---|---|
-| `python main.py <file>` | Reads the file from `Datasets/`, classifies each packet, writes `packet_analysis.csv` |
-| `python analytics.py` | Creates `protocol_stats.csv`, `traffic_over_time.csv`, `top_sources.csv`, `top_destinations.csv`, `top_pairs.csv` |
-| `python -m streamlit run app.py` | Opens the dashboard in your browser (usually http://localhost:8501) |
+| Upload a capture file | Drag in a .pcap, .pcapng or .cap file |
+| Choose from Datasets folder | Select a file from the dropdown (files you put in `Datasets/`) |
+| Live capture | Keep the interface marked ★ (your default route), press ▶ Start, press ■ Stop when done |
 
-If you don't give a file name, `main.py` uses `traffic.pcap`.
+Sidebar options:
 
-To analyze a different file, repeat all three steps, then refresh the browser page.
+- **Protocol / Service / IP filters** narrow every chart and table.
+- **Bandwidth time bin** changes the resolution of the bandwidth chart.
+- **Max packets to load** (offline modes) limits how much of a large file is parsed.
+- **Capture filter** (live mode) is an optional filter such as `tcp port 443`.
+- **Also save raw packets to Datasets/** (live mode) writes a `.pcap` you can reopen later from the Datasets dropdown.
+- **Refresh every / Show last** (live mode) control the auto-refresh and the time window.
+- **Clear data** (live mode) empties the live buffer.
+- **Export** button under the packet table downloads the filtered packets as CSV.
 
-## 3. Live capture
+### Live capture extras
 
-Use two terminals, both inside `CN_project`.
+- The interface list puts the adapter with your default route first (★) and moves virtual, Bluetooth and no-network adapters to the bottom.
+- Download and upload are shown separately (relative to your machine's IP), both as cards and as lines on the bandwidth chart.
+- "Top remote hosts" shows domain names when the matching DNS reply was captured, for example `youtube.com (142.250.80.46)`. Encrypted DNS (DoH/DoT) hides these.
+- If no packets arrive within a few seconds, the page warns that the interface is probably wrong.
 
-**Terminal 1** (open as **Administrator** on Windows, or use `sudo` on Linux/macOS):
+## 4. Optional command-line analysis
 
 ```
-python live_capture.py --list
-python live_capture.py --iface "Wi-Fi"
+python main.py SkypeIRC.cap      # looks inside Datasets/, writes packet_analysis.csv
+python analytics.py              # writes the summary CSV files
 ```
-
-**Terminal 2:**
-
-```
-python -m streamlit run live_dashboard.py
-```
-
-Browse the web or play a video and watch the dashboard update. Press `Ctrl+C` in Terminal 1 to stop capturing.
-
-### Live capture options
-
-| Option | Example | Meaning |
-|---|---|---|
-| `--list` | `python live_capture.py --list` | Show network interfaces and exit |
-| `--iface` | `--iface "Ethernet"` | Choose the interface to capture on |
-| `--duration` | `--duration 60` | Stop automatically after 60 seconds |
-| `--filter` | `--filter "tcp port 443"` | Capture only matching traffic (BPF filter) |
-| `--offline` | `--offline Datasets/traffic.pcap` | Replay a file instead of sniffing (for testing) |
-
-Only capture on your own computer or on a network you are authorized to monitor.
-
-## 4. Using the dashboard
-
-- **Sidebar filters:** protocol, service, and IP address.
-- **Time bin slider:** changes the resolution of the bandwidth chart (`app.py`).
-- **Export CSV button:** downloads the currently filtered packets.
-- **Spike detection:** a point is flagged when its bandwidth is above the mean plus 2 standard deviations.
-- Stop the dashboard with `Ctrl+C` in its terminal.
 
 ## 5. Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `streamlit` is not recognized | Use `python -m streamlit run app.py` instead |
-| `No module named ...` | Run `python -m pip install scapy pandas plotly streamlit` |
-| `File not found` from `main.py` | Check the file is inside `Datasets/` and the name is spelled correctly |
-| Dashboard shows old data | Re-run `main.py` and `analytics.py`, then refresh the page |
-| Live capture shows 0 packets | Run the terminal as Administrator, make sure Npcap is installed, and pick the correct interface with `--list` |
-| `Permission denied` | Run the terminal as Administrator (or use `sudo`) |
-| Live dashboard says "Waiting for packets" | Start `live_capture.py` first, from the same folder |
-| `st.fragment` error in live dashboard | Update Streamlit: `python -m pip install -U streamlit` |
-| Charts look empty for a small capture | Normal for captures that last only a second or two. Try `SkypeIRC.cap` or a longer file |
+| `streamlit` is not recognized | Use `python -m streamlit run app.py` |
+| `No module named ...` | `python -m pip install scapy pandas plotly streamlit` |
+| Live: "Could not start capture" | Run the terminal as Administrator / with `sudo`, install Npcap (Windows) |
+| Live: 0 packets | Choose the ★ interface, or the one that shows your real IP (Wi-Fi or Ethernet), not Bluetooth or virtual adapters |
+| Live: filter error | Capture filters need Npcap/libpcap. Leave the filter empty if unsure |
+| Live mode asks for a newer Streamlit | `python -m pip install -U streamlit` |
+| No files in Datasets dropdown | Put the files in the `Datasets` folder next to `app.py` and refresh |
+| Large file is slow | Lower "Max packets to load". Scapy parses a few thousand packets per second |
 
 ## 6. Limitations
 
-- Services are identified by port number only. HTTPS traffic is encrypted, so the exact application cannot be determined.
+- Services are identified by port number only. HTTPS is encrypted, so the exact application is not visible.
 - Traffic on non-standard ports is labelled "Other / ephemeral".
-- Offline analysis works on one capture file at a time.
+- Only capture on networks you are authorised to monitor.
